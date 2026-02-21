@@ -166,7 +166,7 @@ Page(
             method: "POST",
             headers,
             body: JSON.stringify(requestBody),
-            timeout: 20000
+            timeout: 10000
           })
         })
         .then((response) => {
