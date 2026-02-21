@@ -50,6 +50,9 @@
   "i18n": {
     "en-US": {
       "appName": "Voice Bridge"
+    },
+    "pl-PL": {
+      "appName": "Voice Bridge"
     }
   },
   "defaultLanguage": "en-US"

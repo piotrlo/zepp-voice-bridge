@@ -5,7 +5,7 @@ AppSettingsPage({
         label: 'Endpoint URL',
         settingsKey: 'endpoint_url',
         placeholder: 'https://your-api.com/webhook',
-        sublabel: 'Adres URL endpointu docelowego'
+        sublabel: 'Target webhook or API endpoint URL'
       }),
       TextInput({
         label: 'Authorization',
@@ -17,17 +17,17 @@ AppSettingsPage({
         label: 'JSON Key',
         settingsKey: 'payload_key',
         placeholder: 'message',
-        sublabel: 'Klucz pola tekstu w JSON (np. message)'
+        sublabel: 'JSON field name for the text payload (e.g. message)'
       }),
       TextInput({
         label: 'Sender Identifier',
         settingsKey: 'sender_id',
         placeholder: 'watch-user',
-        sublabel: 'Opcjonalny identyfikator nadawcy'
+        sublabel: 'Optional sender label included in the payload'
       }),
       Text({
         paragraph: true,
-        content: 'VoiceBridge wysyła transkrybowany tekst jako JSON POST pod podany endpoint.'
+        content: 'Voice Bridge sends transcribed text as a JSON POST to the configured endpoint.'
       })
     ])
   }

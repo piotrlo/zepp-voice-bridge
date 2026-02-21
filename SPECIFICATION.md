@@ -1,78 +1,88 @@
 # VoiceBridge PoC Specification (Zepp OS)
 
-## 1. Cel produktu
-VoiceBridge to szybka aplikacja "voice-first" na zegarek Amazfit. Po uruchomieniu ma natychmiast otworzyć wejście głosowe, zamienić mowę na tekst i wyświetlić wynik na ekranie. W kolejnym kroku PoC aplikacja wysyła ten tekst jako JSON POST na testowy endpoint.
+## 1. Product Goal
 
-## 2. Zakres Proof of Concept
-PoC obejmuje:
-- automatyczny start voice input po wejściu do aplikacji,
-- transkrypcję lub ręczne wpisanie tekstu,
-- prezentację tekstu na ekranie zegarka,
-- wysłanie treści do endpointu HTTP przez telefon (BLE proxy),
-- konfigurację endpointu i tokenu w ustawieniach Zepp App.
+VoiceBridge is a fast "voice-first" app for Amazfit smartwatches. On launch it immediately opens voice input, converts speech to text and displays the result on screen. The app then sends the text as a JSON POST to a configurable endpoint.
 
-PoC nie obejmuje:
-- historii wiadomości,
-- retry queue offline,
-- zaawansowanej analityki i telemetrii.
+## 2. Proof of Concept Scope
 
-## 3. Wymagania techniczne
-- **Platforma:** Zepp OS v3 runtime z API_LEVEL `4.0`.
-- **SDK UI:** `@zos/ui` z `createKeyboard`.
+PoC includes:
+- automatic voice input on app launch,
+- transcription or manual text entry,
+- text display on the watch screen,
+- HTTP POST to the endpoint via phone (BLE proxy),
+- endpoint and token configuration in the Zepp App settings.
+
+PoC does not include:
+- message history,
+- offline retry queue,
+- advanced analytics or telemetry.
+
+## 3. Technical Requirements
+
+- **Platform:** Zepp OS v3 runtime with API_LEVEL `4.0`.
+- **UI SDK:** `@zos/ui` with `createKeyboard`.
 - **Voice input:** `createKeyboard({ inputType: inputType.VOICE })`.
-- **Fallback:** gdy voice input niedostępny, aplikacja przełącza się na `inputType.CHAR`.
-- **Komunikacja watch-phone:** `@zeppos/zml` (`BasePage`, `BaseSideService`, `BaseApp`).
-- **HTTP:** `this.httpRequest()` z `BasePage`.
+- **Fallback:** when voice input is unavailable, the app falls back to `inputType.CHAR`.
+- **Watch-phone communication:** `@zeppos/zml` (`BasePage`, `BaseSideService`, `BaseApp`).
+- **HTTP:** `this.httpRequest()` from `BasePage`.
 
-## 4. Architektura
-1. `page/index.js` uruchamia voice input i pobiera tekst.
-2. `page/index.js` pobiera konfigurację przez `this.request({ method: "GET_CONFIG" })`.
-3. `app-side/index.js` zwraca konfigurację endpointu z `settingsLib`.
-4. `page/index.js` wykonuje `this.httpRequest()` z payloadem JSON.
-5. Endpoint testowy przyjmuje dane.
+## 4. Architecture
 
-## 5. Konfiguracja użytkownika (Zepp App)
-W ustawieniach aplikacji użytkownik podaje:
-- `endpoint_url` - URL webhooka/test API,
-- `auth_token` - token Bearer (bez prefiksu `Bearer `),
-- `payload_key` - nazwa pola tekstowego w JSON (np. `message`),
-- `sender_id` - opcjonalny identyfikator nadawcy.
+1. `page/index.js` opens voice input and captures text.
+2. `page/index.js` fetches configuration via `this.request({ method: "GET_CONFIG" })`.
+3. `app-side/index.js` returns endpoint configuration from `settingsLib`.
+4. `page/index.js` performs `this.httpRequest()` with a JSON payload.
+5. The target endpoint receives the data.
 
-## 6. Format requestu
-Domyślny request:
+## 5. User Configuration (Zepp App)
+
+The user provides the following in the app settings:
+- `endpoint_url` – webhook or API endpoint URL,
+- `auth_token` – full Authorization header value (e.g. `Bearer xxx`, `Basic yyy`). Empty = no auth header,
+- `payload_key` – JSON field name for the text (e.g. `message`),
+- `sender_id` – optional sender identifier.
+
+## 6. Request Format
+
+Default request:
 
 ```json
 {
-  "message": "Kup mleko i chleb",
+  "message": "Buy milk and bread",
   "sender": "watch-user"
 }
 ```
 
-`message` jest zastępowalne przez `payload_key`.
-Pole `sender` jest opcjonalne i wysyłane tylko, gdy `sender_id` jest ustawione.
+`message` is replaceable via `payload_key`.
+The `sender` field is optional and only included when `sender_id` is set.
 
-## 7. User flow
-1. Użytkownik uruchamia VoiceBridge.
-2. Aplikacja natychmiast przechodzi do voice input.
-3. Użytkownik mówi lub wpisuje tekst.
-4. Aplikacja wyświetla transkrypcję na ekranie.
-5. Aplikacja wysyła JSON POST do endpointu.
-6. Użytkownik widzi status (`Listening`, `Transcribed`, `Sending`, `Sent` lub `Error`).
+## 7. User Flow
 
-## 8. Kryteria akceptacji PoC
-- Aplikacja instaluje się przez QR (`zeus preview`) w trybie deweloperskim.
-- Po otwarciu od razu uruchamia input głosowy.
-- Tekst po zakończeniu jest widoczny na ekranie zegarka.
-- Dla poprawnej konfiguracji endpointu wykonuje się HTTP POST.
-- W razie niedostępności voice input działa fallback do klawiatury tekstowej.
+1. User launches VoiceBridge.
+2. App immediately opens voice input.
+3. User speaks or types text.
+4. App displays the transcription on screen.
+5. App sends a JSON POST to the endpoint.
+6. User sees status (`Listening`, `Transcribed`, `Sending`, `Sent` or `Error`).
 
-## 9. Ryzyka i ograniczenia
-- Voice input może być zależny od regionu i firmware.
-- Brak połączenia zegarka z telefonem blokuje `httpRequest`.
-- Błędna konfiguracja endpointu/tokenu skutkuje statusem `Error`.
+## 8. PoC Acceptance Criteria
 
-## 10. Uruchomienie developerskie
+- App installs via QR (`zeus preview`) in developer mode.
+- On launch it immediately opens voice input.
+- Transcribed text is visible on the watch screen.
+- With a valid endpoint configuration, an HTTP POST is executed.
+- When voice input is unavailable, the app falls back to text keyboard.
+
+## 9. Risks and Limitations
+
+- Voice input may depend on region and firmware.
+- No watch-phone connection blocks `httpRequest`.
+- Invalid endpoint or token configuration results in `Error` status.
+
+## 10. Development Setup
+
 1. `bun install`
 2. `zeus preview`
-3. Skan QR w Zepp App (włączony Developer Mode)
-4. Instalacja na zegarku i test end-to-end
+3. Scan QR in the Zepp App (Developer Mode enabled)
+4. Install on watch and run end-to-end test
