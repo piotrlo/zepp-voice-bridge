@@ -1,0 +1,19 @@
+{
+  "name": "voicebridge",
+  "version": "1.0.0",
+  "main": "app.js",
+  "scripts": {
+    "build": "zeus build",
+    "preview": "zeus preview"
+  },
+  "dependencies": {
+    "@zeppos/zml": "^0.0.41"
+  },
+  "devDependencies": {
+    "@zeppos/device-types": "^3.0.1",
+    "@zeppos/zeus-cli": "^1.8.2"
+  },
+  "_moduleAliases": {
+    "zeppos-app-utils": "node_modules/@zeppos/zeus-cli/private-modules/zeppos-app-utils"
+  }
+}

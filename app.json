@@ -1,0 +1,56 @@
+{
+  "configVersion": "v3",
+  "app": {
+    "appId": 1106856,
+    "appType": "app",
+    "appName": "Voice Bridge",
+    "version": {
+      "code": 1,
+      "name": "1.0.0"
+    },
+    "icon": "icon.png",
+    "vender": "Piotr Loch",
+    "description": "Voice-to-webhook bridge"
+  },
+  "permissions": [
+    "device:os.keyboard",
+    "data:os.device.info"
+  ],
+  "runtime": {
+    "apiVersion": {
+      "compatible": "4.0",
+      "target": "4.0",
+      "minVersion": "4.0"
+    }
+  },
+  "debug": false,
+  "targets": {
+    "gt": {
+      "module": {
+        "page": {
+          "pages": [
+            "page/index"
+          ]
+        },
+        "app-side": {
+          "path": "app-side/index"
+        },
+        "setting": {
+          "path": "settings/index"
+        }
+      },
+      "platforms": [
+        {
+          "st": "r"
+        }
+      ],
+      "designWidth": 336
+    }
+  },
+  "i18n": {
+    "en-US": {
+      "appName": "Voice Bridge"
+    }
+  },
+  "defaultLanguage": "en-US"
+}
