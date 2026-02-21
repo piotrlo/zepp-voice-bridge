@@ -8,6 +8,14 @@ You speak into the watch, the text gets transcribed, and the app sends it as an 
 
 Works with anything that accepts a webhook: **n8n**, **Zapier**, **Make**, **Home Assistant**, **OpenAI**, **Claude**, **Slack bots**, or your own API.
 
+## Screenshots
+
+<p align="center">
+  <img src="screenshots/screenshot-2.png" width="200" alt="Voice input">
+  <img src="screenshots/screenshot-1.png" width="200" alt="Transcription">
+  <img src="screenshots/screenshot-3.png" width="200" alt="Sent">
+</p>
+
 ## How It Works
 
 ```
