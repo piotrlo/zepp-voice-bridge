@@ -135,6 +135,19 @@ Page(
       this.responseWidget.setProperty(prop.TEXT, `HTTP: ${this.state.responseCode}`)
     },
     /**
+     * Extracts a displayable string from the HTTP response body.
+     * Handles string, object and missing body gracefully.
+     *
+     * @param {object} response - Raw httpRequest response.
+     * @param {number} maxLength - Maximum characters to display.
+     * @returns {string} Parsed body text or empty string.
+     */
+    parseResponseBody(response, maxLength = 200) {
+      if (!response || !response.body) return ""
+      const raw = typeof response.body === "string" ? response.body : JSON.stringify(response.body)
+      return raw.length > maxLength ? raw.slice(0, maxLength) + "…" : raw
+    },
+    /**
      * Fetches phone-side config and sends the captured text to configured endpoint.
      *
      * @param {string} text - Text payload captured on watch.
@@ -172,6 +185,10 @@ Page(
         .then((response) => {
           const statusCode = response && typeof response.status === "number" ? response.status : 200
           this.updateResponseCode(statusCode)
+          const body = this.parseResponseBody(response)
+          if (body) {
+            this.resultWidget.setProperty(prop.TEXT, body)
+          }
           this.updateStatus("Sent")
           showToast({ content: "Sent" })
           vibrate({ type: "short" })
