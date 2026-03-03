@@ -26,6 +26,7 @@ PoC does not include:
 - **Fallback:** when voice input is unavailable, the app falls back to `inputType.CHAR`.
 - **Watch-phone communication:** `@zeppos/zml` (`BasePage`, `BaseSideService`, `BaseApp`).
 - **HTTP:** `this.httpRequest()` from `BasePage`.
+- **HTTP timeout:** 10 seconds.
 
 ## 4. Architecture
 

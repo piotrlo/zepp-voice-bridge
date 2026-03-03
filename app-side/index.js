@@ -4,20 +4,24 @@ const DEFAULT_CONFIG = {
   endpoint_url: "",
   auth_token: "",
   payload_key: "message",
-  sender_id: ""
+  sender_id: "",
+  include_timestamp: false
 }
 
 /**
  * Builds endpoint configuration from phone settings with fallback defaults.
  *
- * @returns {{endpoint_url: string, auth_token: string, payload_key: string, sender_id: string}}
+ * @returns {{endpoint_url: string, auth_token: string, payload_key: string, sender_id: string, include_timestamp: boolean}}
  */
 function getConfig() {
+  const includeTimestampRaw = settingsLib.getItem("include_timestamp")
+
   return {
     endpoint_url: settingsLib.getItem("endpoint_url") || DEFAULT_CONFIG.endpoint_url,
     auth_token: settingsLib.getItem("auth_token") || DEFAULT_CONFIG.auth_token,
     payload_key: settingsLib.getItem("payload_key") || DEFAULT_CONFIG.payload_key,
-    sender_id: settingsLib.getItem("sender_id") || DEFAULT_CONFIG.sender_id
+    sender_id: settingsLib.getItem("sender_id") || DEFAULT_CONFIG.sender_id,
+    include_timestamp: includeTimestampRaw === "true" || includeTimestampRaw === true
   }
 }
 

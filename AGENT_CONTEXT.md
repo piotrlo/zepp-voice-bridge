@@ -8,7 +8,7 @@ Voice Bridge is a Zepp OS smartwatch app that captures voice input (speech-to-te
 - **App Name:** Voice Bridge
 - **Repo:** https://github.com/piotrlo/zepp-voice-bridge (private)
 - **Author:** Piotr Loch
-- **Status:** PoC working on physical device (Amazfit Active 2 NFC), preparing for Zepp App Store publication.
+- **Status:** v1.1 in progress on physical device (Amazfit Active 2 NFC), preparing for Zepp App Store publication.
 
 ## Tech Stack
 
@@ -67,7 +67,7 @@ The `auth_token` settings field accepts the **full Authorization header value** 
 All widget coordinates and sizes use `px()` from `@zos/utils` based on `designWidth: 336`. This auto-scales to different round screen devices.
 
 ### Error handling for HTTP responses
-ZML's `httpRequest` sometimes resolves even when the response is non-standard. The app treats unknown errors as "sent" (status `UNK`) with vibration, since delivery usually succeeds even when the response parsing fails. Only explicit HTTP error status codes show "Error".
+The app distinguishes explicit HTTP failures (`4xx`, `5xx`) from connection errors. Status color and text communicate whether the failure is authorization/request related, server related, or connectivity related.
 
 ### No hardcoded credentials
 Default config in `app-side/index.js` has empty `endpoint_url` and `auth_token`. User must configure via Zepp App settings.
@@ -94,9 +94,9 @@ npx zeus build
 1. **Voice input requires one tap** – `inputType.VOICE` opens the microphone screen but user must tap the mic button to start recording. There's no API to auto-start recording.
 2. **BLE channel congestion** – During data sync, installing the app may fail with "bluetooth channel not available". Fix: wait for sync to finish, keep Zepp App in foreground.
 3. **vibrate() in openVoiceInput breaks keyboard** – Adding `vibrate()` before `createKeyboard()` prevents the keyboard from appearing. Vibration works fine after HTTP response.
-4. **httpRequest error handling** – ZML proxy may reject responses that are actually successful (e.g. webhook returns markdown). Timeout increased to 20s.
+4. **httpRequest error handling** – ZML proxy behavior can vary by endpoint response format. Timeout is set to 10s and UI now separates HTTP errors from connectivity errors.
 5. **Icon size** – Zeus build warns if icon is not 124x124. Store requires separate 240x240 icon.
-6. **Button positioning** – Round watch screens clip content at edges. `y: px(200)` for the Repeat button works well on 336px baseline. All positioning must use `px()`.
+6. **Button positioning** – Round watch screens clip content at edges. In v1.1, `Try again` appears at `y: px(178)` only for failures and `Repeat` moves to `y: px(248)` when both are visible. All positioning must use `px()`.
 
 ## Pending / Next Steps
 
