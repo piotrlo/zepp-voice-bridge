@@ -11,6 +11,7 @@ const BUTTON_HEIGHT = 62
 const REPEAT_SINGLE_Y = 248
 const TRY_AGAIN_Y = 178
 const HTTP_TIMEOUT_MS = 10000
+const ACTION_COOLDOWN_MS = 400
 const COLOR = {
   NEUTRAL: 0x999999,
   MUTED: 0x888888,
@@ -29,6 +30,8 @@ Page(
       responseCode: "-",
       config: null
     },
+    actionInProgress: false,
+    lastActionEndedAt: 0,
     build() {
       this.createUI()
       this.loadConfig()
@@ -89,6 +92,9 @@ Page(
         press_color: 0xb43434,
         radius: px(35),
         click_func: () => {
+          if (!this.canStartAction()) {
+            return
+          }
           if (!this.state.transcribedText) {
             this.openVoiceInput()
             return
@@ -109,6 +115,9 @@ Page(
         press_color: 0x1a5fd1,
         radius: px(35),
         click_func: () => {
+          if (!this.canStartAction()) {
+            return
+          }
           if (this.state.config && this.state.config.endpoint_url) {
             this.openVoiceInput()
             return
@@ -125,8 +134,9 @@ Page(
      * @returns {void}
      */
     loadConfig() {
+      this.beginAction()
       this.updateButtons(false, false)
-      this.updateStatus("Loading settings...", COLOR.NEUTRAL)
+      this.updateStatus("Connecting to Phone...", COLOR.NEUTRAL)
       this.updateResponseCode("-")
       this.resultWidget.setProperty(prop.TEXT, "")
 
@@ -138,18 +148,22 @@ Page(
           } catch (parseError) {
             logger.error("Config parse error", JSON.stringify(parseError))
             this.showNoConnectionScreen()
+            this.endAction()
             return
           }
           this.state.config = config
           if (!config || !config.endpoint_url || !config.endpoint_url.trim()) {
             this.showNoEndpointScreen()
+            this.endAction()
             return
           }
+          this.endAction()
           this.openVoiceInput()
         })
         .catch((error) => {
           logger.error("Config load error", JSON.stringify(error))
           this.showNoConnectionScreen()
+          this.endAction()
         })
     },
     /**
@@ -172,8 +186,40 @@ Page(
     showNoEndpointScreen() {
       this.updateStatus("Setup Required", COLOR.WARNING)
       this.updateResponseCode("-")
-      this.resultWidget.setProperty(prop.TEXT, "Open Zepp App\nSettings -> Voice Bridge")
+      this.resultWidget.setProperty(
+        prop.TEXT,
+        "1) Open Zepp App\n2) Devices > Your watch > Apps > Voice Bridge\n3) Enter Endpoint URL (HTTPS)\n4) Tap Check Again"
+      )
       this.updateButtons(true, false, "Check Again")
+    },
+    /**
+     * Returns false when a user action should be ignored (debounce / in-flight guard).
+     *
+     * @returns {boolean}
+     */
+    canStartAction() {
+      const now = Date.now()
+      if (this.actionInProgress || now - this.lastActionEndedAt < ACTION_COOLDOWN_MS) {
+        return false
+      }
+      return true
+    },
+    /**
+     * Marks the start of a debounced user or network action.
+     *
+     * @returns {void}
+     */
+    beginAction() {
+      this.actionInProgress = true
+    },
+    /**
+     * Releases debounce guard after an action completes.
+     *
+     * @returns {void}
+     */
+    endAction() {
+      this.actionInProgress = false
+      this.lastActionEndedAt = Date.now()
     },
     /**
      * Updates visibility and layout for action buttons.
@@ -213,11 +259,15 @@ Page(
      * @returns {void}
      */
     openKeyboardInput(keyboardType, isTextFallback = false) {
+      if (!this.canStartAction()) {
+        return
+      }
       if (!this.state.config || !this.state.config.endpoint_url || !this.state.config.endpoint_url.trim()) {
         this.showNoEndpointScreen()
         return
       }
 
+      this.beginAction()
       this.updateButtons(false, false)
       const statusText =
         keyboardType === inputType.VOICE
@@ -235,20 +285,24 @@ Page(
         onComplete: (_, result) => {
           deleteKeyboard()
           if (result && result.data) {
+            this.endAction()
             this.onTranscriptionReady(result.data)
             return
           }
           if (keyboardType === inputType.VOICE) {
+            this.endAction()
             this.openTextInput()
             return
           }
           this.updateStatus("No input", COLOR.MUTED)
           this.updateButtons(true, false)
+          this.endAction()
         },
         onCancel: () => {
           deleteKeyboard()
           this.updateStatus("Cancelled", COLOR.MUTED)
           this.updateButtons(true, false)
+          this.endAction()
         }
       })
     },
@@ -394,12 +448,20 @@ Page(
      * @returns {void}
      */
     sendToEndpoint(text) {
+      if (!this.canStartAction()) {
+        return
+      }
       if (!this.state.config || !this.state.config.endpoint_url || !this.state.config.endpoint_url.trim()) {
         this.showNoEndpointScreen()
         return
       }
 
+      this.beginAction()
       const config = this.state.config
+      const endpointUrl = String(config.endpoint_url).trim()
+      if (endpointUrl.toLowerCase().startsWith("http://")) {
+        showToast({ content: "HTTP not encrypted" })
+      }
       const requestBody = this.buildPayload(text, config)
       const headers = this.buildHeaders(config)
 
@@ -407,7 +469,7 @@ Page(
       this.updateButtons(false, false)
 
       this.httpRequest({
-        url: config.endpoint_url,
+        url: endpointUrl,
         method: "POST",
         headers,
         body: JSON.stringify(requestBody),
@@ -417,6 +479,7 @@ Page(
           const statusCode = response && typeof response.status === "number" ? response.status : 200
           if (statusCode >= 400) {
             this.handleHttpErrorStatus(statusCode)
+            this.endAction()
             return
           }
 
@@ -429,11 +492,13 @@ Page(
           showToast({ content: "Sent" })
           vibrate({ type: "short" })
           this.updateButtons(true, false)
+          this.endAction()
         })
         .catch((error) => {
           logger.error("Send error", JSON.stringify(error))
           if (error && typeof error.status === "number") {
             this.handleHttpErrorStatus(error.status)
+            this.endAction()
             return
           }
           const errorBody = this.parseErrorBody(error)
@@ -446,12 +511,14 @@ Page(
             showToast({ content: "Sent" })
             vibrate({ type: "short" })
             this.updateButtons(true, false)
+            this.endAction()
             return
           }
           this.updateResponseCode("NET")
           this.updateStatus("No connection", COLOR.WARNING)
           showToast({ content: "Error" })
           this.updateButtons(true, true)
+          this.endAction()
         })
     }
   })

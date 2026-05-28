@@ -10,7 +10,7 @@
     },
     "icon": "icon.png",
     "vender": "Piotr Loch",
-    "description": "Voice-to-webhook bridge"
+    "description": "Dictate on your Amazfit watch and send transcribed text as a JSON webhook to any HTTPS endpoint (n8n, Home Assistant, Zapier, your API). Requires Zepp App on a paired phone for settings and HTTP delivery. No message history is stored on the watch."
   },
   "permissions": [
     "device:os.keyboard",

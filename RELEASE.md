@@ -69,11 +69,13 @@ bun run build
 
 Paczka trafia do `dist/` jako `1106856-Voice_Bridge-<wersja>-<timestamp>.zab`.
 
-Opcjonalna walidacja (jeśli masz skrypt lokalnie):
+Walidacja paczki (skrypt w repo — **wymagane** `assets/icon.png` w `.zab`):
 
 ```bash
 ./verify-zab.sh dist/1106856-Voice_Bridge-*.zab
 ```
+
+Skrypt kończy się kodem `1`, gdy brakuje ikony urządzenia w archiwum.
 
 ---
 

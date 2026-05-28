@@ -26,6 +26,30 @@ const FOOTER_TEXT_STYLE = {
 }
 
 /**
+ * Warning style for insecure HTTP endpoint URLs.
+ */
+const HTTP_WARNING_STYLE = {
+  fontSize: "12px",
+  color: "#c2410c",
+  lineHeight: "18px",
+  marginTop: "8px",
+  marginBottom: "4px"
+}
+
+/**
+ * Returns true when the endpoint URL uses plain HTTP (not HTTPS).
+ *
+ * @param {string} url - Endpoint URL from settings storage.
+ * @returns {boolean}
+ */
+function isInsecureHttpUrl(url) {
+  return String(url || "")
+    .trim()
+    .toLowerCase()
+    .startsWith("http://")
+}
+
+/**
  * Text input label style for stronger hierarchy.
  */
 const INPUT_LABEL_STYLE = {
@@ -48,6 +72,9 @@ const INPUT_SUB_STYLE = {
  */
 AppSettingsPage({
   build(props) {
+    const endpointUrl = String(props.settingsStorage.getItem("endpoint_url") || "").trim()
+    const showHttpWarning = isInsecureHttpUrl(endpointUrl)
+
     return Section({}, [
       Text(
         {
@@ -73,10 +100,21 @@ AppSettingsPage({
             label: "Endpoint URL",
             settingsKey: "endpoint_url",
             placeholder: "https://your-api.com/webhook",
-            sublabel: "Webhook or API URL.",
+            sublabel: "Use HTTPS in production. HTTP is not encrypted.",
             labelStyle: INPUT_LABEL_STYLE,
             subStyle: INPUT_SUB_STYLE
           }),
+          ...(showHttpWarning
+            ? [
+                Text(
+                  {
+                    paragraph: true,
+                    style: HTTP_WARNING_STYLE
+                  },
+                  "Security warning: HTTP sends your voice payload without encryption. Prefer https:// for production."
+                )
+              ]
+            : []),
           TextInput({
             label: "Authorization",
             settingsKey: "auth_token",

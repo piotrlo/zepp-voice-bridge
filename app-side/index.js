@@ -9,6 +9,21 @@ const DEFAULT_CONFIG = {
 }
 
 /**
+ * Trims whitespace from a settings value; empty after trim falls back to default.
+ *
+ * @param {string|undefined|null} value - Raw value from settingsLib.
+ * @param {string} fallback - Default when value is missing or blank.
+ * @returns {string}
+ */
+function trimSetting(value, fallback) {
+  if (value == null) {
+    return fallback
+  }
+  const trimmed = String(value).trim()
+  return trimmed === "" ? fallback : trimmed
+}
+
+/**
  * Builds endpoint configuration from phone settings with fallback defaults.
  *
  * @returns {{endpoint_url: string, auth_token: string, payload_key: string, sender_id: string, include_timestamp: boolean}}
@@ -17,10 +32,10 @@ function getConfig() {
   const includeTimestampRaw = settingsLib.getItem("include_timestamp")
 
   return {
-    endpoint_url: settingsLib.getItem("endpoint_url") || DEFAULT_CONFIG.endpoint_url,
-    auth_token: settingsLib.getItem("auth_token") || DEFAULT_CONFIG.auth_token,
-    payload_key: settingsLib.getItem("payload_key") || DEFAULT_CONFIG.payload_key,
-    sender_id: settingsLib.getItem("sender_id") || DEFAULT_CONFIG.sender_id,
+    endpoint_url: trimSetting(settingsLib.getItem("endpoint_url"), DEFAULT_CONFIG.endpoint_url),
+    auth_token: trimSetting(settingsLib.getItem("auth_token"), DEFAULT_CONFIG.auth_token),
+    payload_key: trimSetting(settingsLib.getItem("payload_key"), DEFAULT_CONFIG.payload_key),
+    sender_id: trimSetting(settingsLib.getItem("sender_id"), DEFAULT_CONFIG.sender_id),
     include_timestamp: includeTimestampRaw === "true" || includeTimestampRaw === true
   }
 }

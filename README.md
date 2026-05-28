@@ -54,6 +54,31 @@ The watch captures speech, Zepp OS converts it to text, and the app sends it thr
 
 Both the field name and sender are configurable.
 
+## HTTP response semantics
+
+The watch treats a delivery as **successful** when the HTTP status code is **less than 400** (any **2xx** or **3xx**). Codes **4xx** and **5xx** show an error on screen with the status code. If the runtime omits `status`, the app assumes **200** (success).
+
+| Condition | Watch UI |
+|-----------|----------|
+| Status &lt; 400 | **Sent** (green), short vibration |
+| Status ≥ 400 | **Error {code}** (4xx red / 5xx orange), Try again |
+| No status in response | Treated as **200** (success) |
+| Network failure / timeout | **No connection**, code `NET` |
+| Non-standard body with `"ok":true` or `runid` (no status) | **Sent**, code `UNK` (heuristic) |
+
+- **Request timeout:** 10 seconds (`HTTP_TIMEOUT_MS` in `page/index.js`).
+- **Transport:** JSON POST goes through the paired phone (BLE). Use **HTTPS** on your endpoint; the app does not add encryption beyond TLS on the URL you configure. Plain **HTTP** is allowed but shown with a security warning in Zepp App settings.
+
+## ZAB package validation
+
+After `bun run build`, verify the `.zab` archive before sideload or store upload:
+
+```bash
+./verify-zab.sh dist/1106856-Voice_Bridge-*.zab
+```
+
+The script fails if `manifest.json` or `assets/icon.png` (124×124 device menu icon) is missing inside the package.
+
 ## Requirements
 
 - Amazfit watch running **Zepp OS 3.0+** (API Level 4.0)
