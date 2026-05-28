@@ -8,7 +8,7 @@ Voice Bridge is a Zepp OS smartwatch app that captures voice input (speech-to-te
 - **App Name:** Voice Bridge
 - **Repo:** https://github.com/piotrlo/zepp-voice-bridge (private)
 - **Author:** Piotr Loch
-- **Status:** v1.1 in progress on physical device (Amazfit Active 2 NFC), preparing for Zepp App Store publication.
+- **Status:** v1.1 code-complete on `feature/v1.1` (`8c2a583`); release steps pending (Privacy URL, ZAB rebuild, E2E on Amazfit Active 2 NFC).
 
 ## Tech Stack
 
