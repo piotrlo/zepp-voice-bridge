@@ -5,7 +5,7 @@
   "scripts": {
     "build": "zeus build",
     "preview": "zeus preview",
-    "icon": "rsvg-convert -w 240 -h 240 icon.svg -o icon.png && rsvg-convert -w 240 -h 240 icon.svg | magick - -gravity Center -background none -extent 248x248 assets/icon.png && cp assets/icon.png assets/gt.r/icon.png"
+    "icon": "rsvg-convert -w 240 -h 240 icon.svg -o icon.png && rsvg-convert -w 124 -h 124 icon.svg -o assets/icon.png && cp assets/icon.png assets/gt.r/icon.png"
   },
   "dependencies": {
     "@zeppos/zml": "^0.0.41"

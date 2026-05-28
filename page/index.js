@@ -132,7 +132,14 @@ Page(
 
       this.request({ method: "GET_CONFIG" })
         .then(({ result }) => {
-          const config = JSON.parse(result)
+          let config
+          try {
+            config = JSON.parse(result)
+          } catch (parseError) {
+            logger.error("Config parse error", JSON.stringify(parseError))
+            this.showNoConnectionScreen()
+            return
+          }
           this.state.config = config
           if (!config || !config.endpoint_url || !config.endpoint_url.trim()) {
             this.showNoEndpointScreen()
@@ -188,23 +195,51 @@ Page(
      * @returns {void}
      */
     openVoiceInput() {
+      this.openKeyboardInput(inputType.VOICE)
+    },
+    /**
+     * Opens text keyboard input (CHAR fallback per SPECIFICATION.md).
+     *
+     * @returns {void}
+     */
+    openTextInput() {
+      this.openKeyboardInput(inputType.CHAR, true)
+    },
+    /**
+     * Opens keyboard with the given input type; voice with no result falls back to CHAR.
+     *
+     * @param {number} keyboardType - Zepp OS input type (VOICE or CHAR).
+     * @param {boolean} isTextFallback - True when opening CHAR after empty voice result.
+     * @returns {void}
+     */
+    openKeyboardInput(keyboardType, isTextFallback = false) {
       if (!this.state.config || !this.state.config.endpoint_url || !this.state.config.endpoint_url.trim()) {
         this.showNoEndpointScreen()
         return
       }
 
       this.updateButtons(false, false)
-      this.updateStatus("Listening...", COLOR.NEUTRAL)
+      const statusText =
+        keyboardType === inputType.VOICE
+          ? "Listening..."
+          : isTextFallback
+            ? "Type message..."
+            : "Typing..."
+      this.updateStatus(statusText, COLOR.NEUTRAL)
       this.resultWidget.setProperty(prop.TEXT, "")
       this.state.transcribedText = ""
       this.updateResponseCode("-")
 
       createKeyboard({
-        inputType: inputType.VOICE,
+        inputType: keyboardType,
         onComplete: (_, result) => {
           deleteKeyboard()
           if (result && result.data) {
             this.onTranscriptionReady(result.data)
+            return
+          }
+          if (keyboardType === inputType.VOICE) {
+            this.openTextInput()
             return
           }
           this.updateStatus("No input", COLOR.MUTED)
