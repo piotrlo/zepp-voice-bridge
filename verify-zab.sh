@@ -41,7 +41,20 @@ else
     fi
     
     # Sprawdzenie ikon (krytyczne dla menu zegarka)
-    if ! unzip -l "$PACKET_URL" | grep -q "assets/icon.png"; then
+    # Zeus pakuje źródła w .ip-package wewnątrz .zab — ikona nie jest na top-level archiwum
+    ICON_FOUND=0
+    if unzip -l "$PACKET_URL" | grep -q "assets/icon.png"; then
+        ICON_FOUND=1
+    elif unzip -l "$PACKET_URL" | grep -q "\.ip-package"; then
+        TEMP_DIR=$(mktemp -d)
+        unzip -q "$PACKET_URL" .ip-package -d "$TEMP_DIR" 2>/dev/null
+        if unzip -l "$TEMP_DIR/.ip-package" 2>/dev/null | grep -q "assets/icon.png"; then
+            ICON_FOUND=1
+        fi
+        rm -rf "$TEMP_DIR"
+    fi
+
+    if [ "$ICON_FOUND" -eq 0 ]; then
         echo "❌ Błąd: Brak assets/icon.png w paczce (wymagane 124×124 dla menu zegarka)."
         exit 1
     fi

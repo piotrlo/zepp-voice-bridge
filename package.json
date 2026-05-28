@@ -5,7 +5,7 @@
   "scripts": {
     "build": "zeus build",
     "preview": "zeus preview",
-    "icon": "rsvg-convert -w 240 -h 240 icon.svg -o icon.png && rsvg-convert -w 124 -h 124 icon.svg -o assets/icon.png && cp assets/icon.png assets/gt.r/icon.png"
+    "icon": "rsvg-convert -w 240 -h 240 icon.svg -o icon.png && rsvg-convert -w 124 -h 124 icon.svg -o assets/icon.png && rsvg-convert -w 248 -h 248 icon.svg -o assets/gt.r/icon.png"
   },
   "dependencies": {
     "@zeppos/zml": "^0.0.41"
@@ -13,6 +13,9 @@
   "devDependencies": {
     "@zeppos/device-types": "^3.0.1",
     "@zeppos/zeus-cli": "^1.8.2"
+  },
+  "overrides": {
+    "sharp": "0.34.5"
   },
   "_moduleAliases": {
     "zeppos-app-utils": "node_modules/@zeppos/zeus-cli/private-modules/zeppos-app-utils"
