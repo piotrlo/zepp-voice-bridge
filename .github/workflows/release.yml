@@ -1,0 +1,73 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Zepp OS package
+        run: npx zeus build
+
+      - name: Locate .zab package
+        id: zab
+        run: |
+          ZAB_FILE=$(find dist -name '*.zab' -type f | head -n 1)
+          if [ -z "$ZAB_FILE" ]; then
+            echo "No .zab file found in dist/"
+            exit 1
+          fi
+          echo "file=$ZAB_FILE" >> "$GITHUB_OUTPUT"
+          echo "filename=$(basename "$ZAB_FILE")" >> "$GITHUB_OUTPUT"
+          echo "Found package: $ZAB_FILE"
+
+      - name: Upload .zab artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zepp-voice-bridge-zab
+          path: ${{ steps.zab.outputs.file }}
+          retention-days: 30
+
+      - name: Read app version
+        id: app-version
+        run: |
+          VERSION=$(node -p "require('./app.json').app.version.name")
+          echo "name=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          body: |
+            ## Voice Bridge v${{ steps.app-version.outputs.name }}
+
+            Install the attached `.zab` package via Zepp App or Zeus CLI.
+          files: ${{ steps.zab.outputs.file }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

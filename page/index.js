@@ -2,7 +2,7 @@ import { BasePage } from "@zeppos/zml/base-page"
 import { createWidget, widget, prop, align, createKeyboard, inputType, deleteKeyboard } from "@zos/ui"
 import { showToast } from "@zos/interaction"
 import { log, px } from "@zos/utils"
-import { vibrate } from "@zos/sensor"
+import { vibrate, Vibrator, VIBRATOR_SCENE_TIMER } from "@zos/sensor"
 
 const logger = log.getLogger("VoiceBridge")
 const DESIGN_WIDTH = 336
@@ -12,14 +12,150 @@ const REPEAT_SINGLE_Y = 248
 const TRY_AGAIN_Y = 178
 const HTTP_TIMEOUT_MS = 10000
 const ACTION_COOLDOWN_MS = 400
+const ARC_SIZE = 60
+const ARC_CENTER_X = 168
+const ARC_CENTER_Y = 95
+const ARC_SPIN_INTERVAL_MS = 50
+const ARC_ANGLE_STEP = 10
+const ARC_ARC_SPAN = 270
+const ARC_FINISH_SPIN_MS = 800
+const ARC_LINE_WIDTH = 6
+const STATUS_Y = 40
+const RESPONSE_CODE_Y = 70
+const RESULT_TEXT_Y = 110
+const RESPONSE_TOGGLE_Y = 170
+const REPEAT_SUCCESS_HIDDEN_Y = 210
+const REPEAT_SUCCESS_SHOWN_Y = 280
+const RESPONSE_LINE_WIDTH = 20
 const COLOR = {
   NEUTRAL: 0x999999,
   MUTED: 0x888888,
   WHITE: 0xffffff,
+  SENDING: 0x2d7dff,
   SUCCESS: 0x4caf50,
   WARNING: 0xff8800,
   ERROR_4XX: 0xff4444,
   ERROR_5XX: 0xff6600
+}
+
+/** @type {Vibrator | null} */
+let vibratorMotor = null
+
+/**
+ * Returns a shared vibrator instance using the exported sensor or Vibrator fallback.
+ *
+ * @returns {Vibrator}
+ */
+function getVibratorMotor() {
+  if (!vibratorMotor) {
+    vibratorMotor = typeof vibrate?.start === "function" ? vibrate : new Vibrator()
+  }
+  return vibratorMotor
+}
+
+/**
+ * Runs a single vibration pulse for the given duration in milliseconds.
+ *
+ * @param {number} durationMs - Pulse length in milliseconds.
+ * @returns {void}
+ */
+function runVibrationPulse(durationMs) {
+  const motor = getVibratorMotor()
+  if (typeof motor.stop === "function") {
+    motor.stop()
+  }
+  if (typeof motor.start === "function") {
+    motor.start()
+    setTimeout(() => {
+      if (typeof motor.stop === "function") {
+        motor.stop()
+      }
+    }, durationMs)
+    return
+  }
+  vibrate({ type: "short" })
+}
+
+/**
+ * Short pulse before sending a request to the endpoint.
+ *
+ * @returns {void}
+ */
+function vibrateSendStart() {
+  runVibrationPulse(100)
+}
+
+/**
+ * Double vibration pattern indicating successful delivery.
+ *
+ * @returns {void}
+ */
+function vibrateSuccess() {
+  const motor = getVibratorMotor()
+  if (typeof motor.start === "function") {
+    runVibrationPulse(200)
+    setTimeout(() => runVibrationPulse(200), 300)
+    return
+  }
+  vibrate({ type: "short" })
+}
+
+/**
+ * Long vibration pattern indicating an error.
+ *
+ * @returns {void}
+ */
+function vibrateError() {
+  const motor = getVibratorMotor()
+  if (typeof motor.start === "function") {
+    if (typeof motor.stop === "function") {
+      motor.stop()
+    }
+    motor.start({ mode: VIBRATOR_SCENE_TIMER })
+    setTimeout(() => {
+      if (typeof motor.stop === "function") {
+        motor.stop()
+      }
+    }, 500)
+    return
+  }
+  if (typeof vibrate === "function") {
+    vibrate({ type: "short" })
+    return
+  }
+  runVibrationPulse(500)
+}
+
+/**
+ * Formats a raw HTTP response body for multi-line display on the watch TEXT widget.
+ *
+ * @param {string} raw - Raw response body text.
+ * @returns {string} Pretty-printed text with line breaks.
+ */
+function formatResponseBodyDisplay(raw) {
+  if (!raw) {
+    return ""
+  }
+  let formatted = raw
+  try {
+    const parsed = JSON.parse(raw)
+    formatted = JSON.stringify(parsed, null, 2)
+  } catch {
+    formatted = raw
+  }
+  const lines = formatted.split("\n")
+  return lines
+    .map((line) => {
+      if (line.length <= RESPONSE_LINE_WIDTH) {
+        return line
+      }
+      const chunks = []
+      for (let i = 0; i < line.length; i += RESPONSE_LINE_WIDTH) {
+        chunks.push(line.slice(i, i + RESPONSE_LINE_WIDTH))
+      }
+      return chunks.join("\n")
+    })
+    .join("\n")
 }
 
 Page(
@@ -28,10 +164,15 @@ Page(
       transcribedText: "",
       status: "idle",
       responseCode: "-",
-      config: null
+      config: null,
+      showResponse: false,
+      lastResponseBody: ""
     },
     actionInProgress: false,
     lastActionEndedAt: 0,
+    arcStartAngle: 0,
+    arcSpinTimer: null,
+    arcHideTimer: null,
     build() {
       this.createUI()
       this.loadConfig()
@@ -49,9 +190,9 @@ Page(
 
       this.statusWidget = createWidget(widget.TEXT, {
         x: horizontalPadding,
-        y: px(40),
+        y: px(STATUS_Y),
         w: contentWidth,
-        h: px(40),
+        h: px(36),
         text: "Loading...",
         text_size: px(20),
         color: COLOR.NEUTRAL,
@@ -60,25 +201,59 @@ Page(
 
       this.responseWidget = createWidget(widget.TEXT, {
         x: horizontalPadding,
-        y: px(78),
+        y: px(RESPONSE_CODE_Y),
         w: contentWidth,
-        h: px(26),
+        h: px(22),
         text: "HTTP: -",
-        text_size: px(18),
-        color: 0xaaaaaa,
+        text_size: px(16),
+        color: COLOR.MUTED,
         align_h: align.CENTER_H
       })
 
       this.resultWidget = createWidget(widget.TEXT, {
         x: horizontalPadding,
-        y: px(110),
+        y: px(RESULT_TEXT_Y),
         w: contentWidth,
         h: px(250),
         text: "",
-        text_size: px(28),
-        color: 0xffffff,
+        text_size: px(18),
+        color: COLOR.WHITE,
         align_h: align.CENTER_H
       })
+
+      this.responseToggleButton = createWidget(widget.BUTTON, {
+        x: Math.floor((fullWidth - buttonWidth) / 2),
+        y: px(RESPONSE_TOGGLE_Y),
+        w: buttonWidth,
+        h: px(44),
+        text: "Show response",
+        text_size: px(18),
+        color: COLOR.WHITE,
+        normal_color: 0x444444,
+        press_color: 0x333333,
+        radius: px(22),
+        click_func: () => {
+          this.toggleResponseVisibility()
+        }
+      })
+      this.responseToggleButton.setProperty(prop.VISIBLE, 0)
+
+      this.hideResponseButton = createWidget(widget.BUTTON, {
+        x: Math.floor((fullWidth - buttonWidth / 2) / 2),
+        y: px(290),
+        w: Math.floor(buttonWidth / 2),
+        h: px(44),
+        text: "↩ Hide",
+        text_size: px(16),
+        color: COLOR.WHITE,
+        normal_color: 0x444444,
+        press_color: 0x333333,
+        radius: px(22),
+        click_func: () => {
+          this.hideFullScreenResponse()
+        }
+      })
+      this.hideResponseButton.setProperty(prop.VISIBLE, 0)
 
       this.tryAgainButton = createWidget(widget.BUTTON, {
         x: Math.floor((fullWidth - buttonWidth) / 2),
@@ -125,6 +300,20 @@ Page(
           this.loadConfig()
         }
       })
+
+      const arcOffset = px(ARC_SIZE / 2)
+      this.progressArc = createWidget(widget.ARC, {
+        x: px(ARC_CENTER_X) - arcOffset,
+        y: px(ARC_CENTER_Y) - arcOffset,
+        w: px(ARC_SIZE),
+        h: px(ARC_SIZE),
+        radius: arcOffset,
+        start_angle: 0,
+        end_angle: ARC_ARC_SPAN,
+        line_width: px(ARC_LINE_WIDTH),
+        color: COLOR.SENDING
+      })
+      this.progressArc.setProperty(prop.VISIBLE, 0)
 
       this.updateButtons(false, false)
     },
@@ -173,6 +362,7 @@ Page(
      */
     showNoConnectionScreen() {
       this.state.config = null
+      this.resetResponseToggle()
       this.updateStatus("No connection", COLOR.WARNING)
       this.updateResponseCode("-")
       this.resultWidget.setProperty(prop.TEXT, "Open Zepp App and keep it active,\nthen tap Update settings.")
@@ -184,6 +374,7 @@ Page(
      * @returns {void}
      */
     showNoEndpointScreen() {
+      this.resetResponseToggle()
       this.updateStatus("Setup Required", COLOR.WARNING)
       this.updateResponseCode("-")
       this.resultWidget.setProperty(
@@ -229,11 +420,143 @@ Page(
      * @param {string} repeatText - Label for Repeat button.
      * @returns {void}
      */
-    updateButtons(showRepeat, showTryAgain, repeatText = "Repeat") {
+    updateButtons(showRepeat, showTryAgain, repeatText = "Repeat", repeatY = REPEAT_SINGLE_Y) {
       this.repeatButton.setProperty(prop.VISIBLE, showRepeat ? 1 : 0)
       this.tryAgainButton.setProperty(prop.VISIBLE, showTryAgain ? 1 : 0)
       this.repeatButton.setProperty(prop.TEXT, repeatText)
-      this.repeatButton.setProperty(prop.MORE, { y: px(REPEAT_SINGLE_Y) })
+      this.repeatButton.setProperty(prop.MORE, { y: px(repeatY) })
+    },
+    /**
+     * Sets ARC start and end angles using direct property names for runtime updates.
+     *
+     * @param {number} startAngle - Arc start angle in degrees.
+     * @returns {void}
+     */
+    setArcAngles(startAngle) {
+      this.progressArc.setProperty("start_angle", startAngle)
+      this.progressArc.setProperty("end_angle", startAngle + ARC_ARC_SPAN)
+    },
+    /**
+     * Hides response toggle and clears stored response body state.
+     *
+     * @returns {void}
+     */
+    resetResponseToggle() {
+      if (this.state.showResponse) {
+        this.hideFullScreenResponse()
+      }
+      this.state.showResponse = false
+      this.state.lastResponseBody = ""
+      if (this.responseToggleButton) {
+        this.responseToggleButton.setProperty(prop.VISIBLE, 0)
+        this.responseToggleButton.setProperty(prop.TEXT, "Show response")
+      }
+      if (this.hideResponseButton) {
+        this.hideResponseButton.setProperty(prop.VISIBLE, 0)
+      }
+    },
+    /**
+     * Stores full response body and shows the post-send success layout.
+     *
+     * @param {object} response - Raw httpRequest response.
+     * @returns {void}
+     */
+    showSendSuccessScreen(response) {
+      this.state.showResponse = false
+      this.state.lastResponseBody = this.getFullResponseBody(response)
+      this.resultWidget.setProperty(prop.TEXT, "")
+      this.resultWidget.setProperty(prop.VISIBLE, 0)
+      if (this.state.lastResponseBody) {
+        this.responseToggleButton.setProperty(prop.VISIBLE, 1)
+        this.responseToggleButton.setProperty(prop.TEXT, "Show response")
+      } else {
+        this.responseToggleButton.setProperty(prop.VISIBLE, 0)
+      }
+      this.updateSuccessLayout()
+      this.updateButtons(true, false, "Repeat", REPEAT_SUCCESS_HIDDEN_Y)
+    },
+    /**
+     * Repositions widgets for the success screen based on response visibility.
+     *
+     * @returns {void}
+     */
+    updateSuccessLayout() {
+      this.repeatButton.setProperty(prop.MORE, { y: px(REPEAT_SUCCESS_HIDDEN_Y) })
+      this.resultWidget.setProperty(prop.VISIBLE, 0)
+      if (this.state.lastResponseBody) {
+        this.responseToggleButton.setProperty(prop.TEXT, "Show response")
+      }
+    },
+    /**
+     * Opens full-screen formatted response body view with a back button.
+     *
+     * @returns {void}
+     */
+    showFullScreenResponse() {
+      if (!this.state.lastResponseBody) {
+        return
+      }
+      this.state.showResponse = true
+
+      this.statusWidget.setProperty(prop.VISIBLE, 0)
+      this.responseWidget.setProperty(prop.VISIBLE, 0)
+      this.progressArc.setProperty(prop.VISIBLE, 0)
+      this.repeatButton.setProperty(prop.VISIBLE, 0)
+      this.tryAgainButton.setProperty(prop.VISIBLE, 0)
+      this.responseToggleButton.setProperty(prop.VISIBLE, 0)
+
+      const displayText = formatResponseBodyDisplay(this.state.lastResponseBody)
+      this.resultWidget.setProperty(prop.TEXT, displayText)
+      this.resultWidget.setProperty(prop.MORE, { y: px(40), h: px(250) })
+      this.resultWidget.setProperty(prop.VISIBLE, 1)
+
+      this.hideResponseButton.setProperty(prop.VISIBLE, 1)
+    },
+    /**
+     * Restores the success screen layout after full-screen response view.
+     *
+     * @returns {void}
+     */
+    hideFullScreenResponse() {
+      this.state.showResponse = false
+
+      this.statusWidget.setProperty(prop.VISIBLE, 1)
+      this.responseWidget.setProperty(prop.VISIBLE, 1)
+      this.resultWidget.setProperty(prop.TEXT, "")
+      this.resultWidget.setProperty(prop.MORE, { y: px(RESULT_TEXT_Y), h: px(250) })
+      this.resultWidget.setProperty(prop.VISIBLE, 0)
+
+      if (this.state.lastResponseBody) {
+        this.responseToggleButton.setProperty(prop.VISIBLE, 1)
+        this.responseToggleButton.setProperty(prop.TEXT, "Show response")
+      }
+      this.repeatButton.setProperty(prop.MORE, { y: px(REPEAT_SUCCESS_HIDDEN_Y) })
+      this.repeatButton.setProperty(prop.VISIBLE, 1)
+
+      this.hideResponseButton.setProperty(prop.VISIBLE, 0)
+    },
+    /**
+     * Opens full-screen response view when the user taps Show response.
+     *
+     * @returns {void}
+     */
+    toggleResponseVisibility() {
+      if (!this.state.lastResponseBody) {
+        return
+      }
+      this.showFullScreenResponse()
+    },
+    /**
+     * Returns the full HTTP response body as a string without truncation.
+     *
+     * @param {object} response - Raw httpRequest response.
+     * @returns {string} Full body text or empty string.
+     */
+    getFullResponseBody(response) {
+      if (!response || !response.body) {
+        return ""
+      }
+      return typeof response.body === "string" ? response.body : JSON.stringify(response.body)
     },
     /**
      * Opens voice keyboard input.
@@ -268,6 +591,8 @@ Page(
       }
 
       this.beginAction()
+      this.hideProgressArc()
+      this.resetResponseToggle()
       this.updateButtons(false, false)
       const statusText =
         keyboardType === inputType.VOICE
@@ -340,6 +665,81 @@ Page(
     updateResponseCode(code) {
       this.state.responseCode = String(code)
       this.responseWidget.setProperty(prop.TEXT, `HTTP: ${this.state.responseCode}`)
+    },
+    /**
+     * Clears ARC animation timers and hides the progress indicator.
+     *
+     * @returns {void}
+     */
+    hideProgressArc() {
+      if (this.arcSpinTimer !== null) {
+        clearTimeout(this.arcSpinTimer)
+        this.arcSpinTimer = null
+      }
+      if (this.arcHideTimer !== null) {
+        clearTimeout(this.arcHideTimer)
+        this.arcHideTimer = null
+      }
+      if (this.progressArc) {
+        this.progressArc.setProperty(prop.VISIBLE, 0)
+      }
+    },
+    /**
+     * Starts the spinning ARC indicator for the sending state.
+     *
+     * @returns {void}
+     */
+    showProgressArcSending() {
+      this.hideProgressArc()
+      this.arcStartAngle = 0
+      this.progressArc.setProperty(prop.COLOR, COLOR.SENDING)
+      this.setArcAngles(this.arcStartAngle)
+      this.progressArc.setProperty(prop.VISIBLE, 1)
+
+      const spinFrame = () => {
+        if (this.arcSpinTimer === null) {
+          return
+        }
+        this.arcStartAngle = (this.arcStartAngle + ARC_ANGLE_STEP) % 360
+        this.setArcAngles(this.arcStartAngle)
+        this.arcSpinTimer = setTimeout(spinFrame, ARC_SPIN_INTERVAL_MS)
+      }
+      this.arcSpinTimer = setTimeout(spinFrame, ARC_SPIN_INTERVAL_MS)
+    },
+    /**
+     * Keeps ARC spinning with a final success or error color, then hides after a short delay.
+     *
+     * @param {number} color - Final ARC color (success or error).
+     * @returns {void}
+     */
+    finishProgressArc(color) {
+      if (this.arcHideTimer !== null) {
+        clearTimeout(this.arcHideTimer)
+        this.arcHideTimer = null
+      }
+      this.progressArc.setProperty(prop.COLOR, color)
+      this.progressArc.setProperty(prop.VISIBLE, 1)
+
+      if (this.arcSpinTimer === null) {
+        const spinFrame = () => {
+          if (this.arcSpinTimer === null) {
+            return
+          }
+          this.arcStartAngle = (this.arcStartAngle + ARC_ANGLE_STEP) % 360
+          this.setArcAngles(this.arcStartAngle)
+          this.arcSpinTimer = setTimeout(spinFrame, ARC_SPIN_INTERVAL_MS)
+        }
+        this.arcSpinTimer = setTimeout(spinFrame, ARC_SPIN_INTERVAL_MS)
+      }
+
+      this.arcHideTimer = setTimeout(() => {
+        if (this.arcSpinTimer !== null) {
+          clearTimeout(this.arcSpinTimer)
+          this.arcSpinTimer = null
+        }
+        this.progressArc.setProperty(prop.VISIBLE, 0)
+        this.arcHideTimer = null
+      }, ARC_FINISH_SPIN_MS)
     },
     /**
      * Extracts a displayable string from the HTTP response body.
@@ -436,8 +836,11 @@ Page(
     handleHttpErrorStatus(statusCode) {
       const is4xx = statusCode >= 400 && statusCode < 500
       const color = is4xx ? COLOR.ERROR_4XX : COLOR.ERROR_5XX
+      this.resetResponseToggle()
       this.updateResponseCode(statusCode)
       this.updateStatus(`Error ${statusCode}`, color)
+      this.finishProgressArc(color)
+      vibrateError()
       showToast({ content: "Error" })
       this.updateButtons(true, true)
     },
@@ -457,6 +860,11 @@ Page(
       }
 
       this.beginAction()
+      this.state.showResponse = false
+      this.state.lastResponseBody = ""
+      if (this.responseToggleButton) {
+        this.responseToggleButton.setProperty(prop.VISIBLE, 0)
+      }
       const config = this.state.config
       const endpointUrl = String(config.endpoint_url).trim()
       if (endpointUrl.toLowerCase().startsWith("http://")) {
@@ -466,7 +874,10 @@ Page(
       const headers = this.buildHeaders(config)
 
       this.updateStatus("Sending...", COLOR.NEUTRAL)
+      this.resultWidget.setProperty(prop.VISIBLE, 0)
       this.updateButtons(false, false)
+      this.showProgressArcSending()
+      vibrateSendStart()
 
       this.httpRequest({
         url: endpointUrl,
@@ -484,14 +895,11 @@ Page(
           }
 
           this.updateResponseCode(statusCode)
-          const body = this.parseResponseBody(response)
-          if (body) {
-            this.resultWidget.setProperty(prop.TEXT, body)
-          }
           this.updateStatus("Sent", COLOR.SUCCESS)
           showToast({ content: "Sent" })
-          vibrate({ type: "short" })
-          this.updateButtons(true, false)
+          this.finishProgressArc(COLOR.SUCCESS)
+          vibrateSuccess()
+          this.showSendSuccessScreen(response)
           this.endAction()
         })
         .catch((error) => {
@@ -504,18 +912,28 @@ Page(
           const errorBody = this.parseErrorBody(error)
           if (this.isSuccessLikePayload(errorBody)) {
             this.updateResponseCode("UNK")
-            if (errorBody) {
-              this.resultWidget.setProperty(prop.TEXT, errorBody)
-            }
             this.updateStatus("Sent", COLOR.SUCCESS)
             showToast({ content: "Sent" })
-            vibrate({ type: "short" })
-            this.updateButtons(true, false)
+            this.finishProgressArc(COLOR.SUCCESS)
+            vibrateSuccess()
+            this.state.lastResponseBody = errorBody
+            this.state.showResponse = false
+            this.resultWidget.setProperty(prop.TEXT, "")
+            this.resultWidget.setProperty(prop.VISIBLE, 0)
+            if (errorBody) {
+              this.responseToggleButton.setProperty(prop.VISIBLE, 1)
+              this.responseToggleButton.setProperty(prop.TEXT, "Show response")
+            }
+            this.updateSuccessLayout()
+            this.updateButtons(true, false, "Repeat", REPEAT_SUCCESS_HIDDEN_Y)
             this.endAction()
             return
           }
+          this.resetResponseToggle()
           this.updateResponseCode("NET")
           this.updateStatus("No connection", COLOR.WARNING)
+          this.finishProgressArc(COLOR.ERROR_4XX)
+          vibrateError()
           showToast({ content: "Error" })
           this.updateButtons(true, true)
           this.endAction()

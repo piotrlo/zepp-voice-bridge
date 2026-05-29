@@ -2,17 +2,17 @@
  * Shared section style for visual grouping in settings.
  */
 const SECTION_STYLE = {
-  marginBottom: "10px"
+  marginBottom: "16px"
 }
 
 /**
- * Intro text style shown at the top of settings page.
+ * Intro and section description text style.
  */
 const HEADER_TEXT_STYLE = {
-  fontSize: "12px",
-  color: "#5f6775",
+  fontSize: "13px",
+  color: "#4b5563",
   lineHeight: "18px",
-  marginBottom: "10px"
+  marginBottom: "8px"
 }
 
 /**
@@ -20,9 +20,9 @@ const HEADER_TEXT_STYLE = {
  */
 const FOOTER_TEXT_STYLE = {
   fontSize: "11px",
-  color: "#6b7280",
+  color: "#9ca3af",
   lineHeight: "16px",
-  marginTop: "6px"
+  marginTop: "4px"
 }
 
 /**
@@ -34,6 +34,33 @@ const HTTP_WARNING_STYLE = {
   lineHeight: "18px",
   marginTop: "8px",
   marginBottom: "4px"
+}
+
+/**
+ * Text input label style for stronger hierarchy.
+ */
+const INPUT_LABEL_STYLE = {
+  fontSize: "14px",
+  fontWeight: "bold"
+}
+
+/**
+ * Text input sublabel style for descriptions below fields.
+ */
+const INPUT_SUB_STYLE = {
+  fontSize: "11px",
+  color: "#9ca3af",
+  lineHeight: "16px"
+}
+
+/**
+ * Status text style for test connection results.
+ */
+const TEST_STATUS_STYLE = {
+  fontSize: "12px",
+  color: "#4b5563",
+  lineHeight: "18px",
+  marginTop: "8px"
 }
 
 /**
@@ -50,22 +77,6 @@ function isInsecureHttpUrl(url) {
 }
 
 /**
- * Text input label style for stronger hierarchy.
- */
-const INPUT_LABEL_STYLE = {
-  fontSize: "13px"
-}
-
-/**
- * Text input sublabel style for descriptions below fields.
- */
-const INPUT_SUB_STYLE = {
-  fontSize: "11px",
-  color: "#6b7280",
-  lineHeight: "16px"
-}
-
-/**
  * Renders application settings for Voice Bridge.
  *
  * @returns {void}
@@ -74,33 +85,27 @@ AppSettingsPage({
   build(props) {
     const endpointUrl = String(props.settingsStorage.getItem("endpoint_url") || "").trim()
     const showHttpWarning = isInsecureHttpUrl(endpointUrl)
+    const testStatus = String(props.settingsStorage.getItem("test_connection_status") || "").trim()
 
     return Section({}, [
-      Text(
-        {
-          paragraph: true,
-          style: HEADER_TEXT_STYLE
-        },
-        "Quick setup for voice-to-webhook delivery."
-      ),
       Section(
         {
-          title: "Endpoint",
+          title: "📍 Endpoint",
           style: SECTION_STYLE
         },
         [
           Text(
             {
               paragraph: true,
-              style: FOOTER_TEXT_STYLE
+              style: HEADER_TEXT_STYLE
             },
-            "Where your message should be sent."
+            "Where to send your voice transcript."
           ),
           TextInput({
             label: "Endpoint URL",
             settingsKey: "endpoint_url",
-            placeholder: "https://your-api.com/webhook",
-            sublabel: "Use HTTPS in production. HTTP is not encrypted.",
+            placeholder: "https://example.com/webhook",
+            sublabel: "HTTPS required in production",
             labelStyle: INPUT_LABEL_STYLE,
             subStyle: INPUT_SUB_STYLE
           }),
@@ -111,7 +116,7 @@ AppSettingsPage({
                     paragraph: true,
                     style: HTTP_WARNING_STYLE
                   },
-                  "Security warning: HTTP sends your voice payload without encryption. Prefer https:// for production."
+                  "⚠️ HTTP is not encrypted"
                 )
               ]
             : []),
@@ -119,7 +124,7 @@ AppSettingsPage({
             label: "Authorization",
             settingsKey: "auth_token",
             placeholder: "Bearer your-token",
-            sublabel: "Full Authorization value, e.g. Bearer xxx.",
+            sublabel: "Optional. Full Authorization header value",
             labelStyle: INPUT_LABEL_STYLE,
             subStyle: INPUT_SUB_STYLE
           })
@@ -127,30 +132,30 @@ AppSettingsPage({
       ),
       Section(
         {
-          title: "Payload",
+          title: "📦 Payload",
           style: SECTION_STYLE
         },
         [
           Text(
             {
               paragraph: true,
-              style: FOOTER_TEXT_STYLE
+              style: HEADER_TEXT_STYLE
             },
-            "Define JSON fields sent to your endpoint."
+            "Customize the JSON body sent to your endpoint."
           ),
           TextInput({
             label: "JSON Key",
             settingsKey: "payload_key",
             placeholder: "message",
-            sublabel: "Field name for transcribed text.",
+            sublabel: "Field name for the transcribed text",
             labelStyle: INPUT_LABEL_STYLE,
             subStyle: INPUT_SUB_STYLE
           }),
           TextInput({
-            label: "Sender Identifier",
+            label: "Sender ID",
             settingsKey: "sender_id",
             placeholder: "watch-user",
-            sublabel: "Optional sender label.",
+            sublabel: "Optional label identifying the sender",
             labelStyle: INPUT_LABEL_STYLE,
             subStyle: INPUT_SUB_STYLE
           }),
@@ -163,16 +168,48 @@ AppSettingsPage({
               paragraph: true,
               style: FOOTER_TEXT_STYLE
             },
-            "When enabled, requests include Unix timestamp in seconds."
+            "Adds Unix timestamp (seconds) to each request"
           )
         ]
       ),
-      Text(
+      Section(
         {
-          paragraph: true,
-          style: FOOTER_TEXT_STYLE
+          title: "🧪 Test Connection",
+          style: SECTION_STYLE
         },
-        "Privacy: no message history is stored on the watch."
+        [
+          Text(
+            {
+              paragraph: true,
+              style: HEADER_TEXT_STYLE
+            },
+            "Send a test payload to verify your endpoint."
+          ),
+          Button({
+            label: "Send Test POST",
+            style: {
+              fontSize: "14px",
+              borderRadius: "8px",
+              background: "#2d7dff",
+              color: "#ffffff"
+            },
+            onClick() {
+              props.settingsStorage.setItem("test_connection_status", "Sending test...")
+              props.settingsStorage.setItem("test_connection_trigger", String(Date.now()))
+            }
+          }),
+          ...(testStatus
+            ? [
+                Text(
+                  {
+                    paragraph: true,
+                    style: TEST_STATUS_STYLE
+                  },
+                  testStatus
+                )
+              ]
+            : [])
+        ]
       )
     ])
   }
