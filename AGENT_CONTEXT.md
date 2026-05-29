@@ -8,7 +8,8 @@ Voice Bridge is a Zepp OS smartwatch app that captures voice input (speech-to-te
 - **App Name:** Voice Bridge
 - **Repo:** https://github.com/piotrlo/zepp-voice-bridge (private)
 - **Author:** Piotr Loch
-- **Status:** v1.1 code-complete on `feature/v1.1` (`8c2a583`); release steps pending (Privacy URL, ZAB rebuild, E2E on Amazfit Active 2 NFC).
+- **Status:** v1.1.0 released on GitHub (tag `v1.1.0`); awaiting Zepp App Store review (package built by GitHub Actions, manual upload to Zepp Console pending).
+- **CI/CD:** GitHub Actions workflow (`.github/workflows/release.yml`) — on tag push, builds ZAB and creates GitHub Release.
 
 ## Tech Stack
 
@@ -27,25 +28,28 @@ Voice Bridge is a Zepp OS smartwatch app that captures voice input (speech-to-te
 
 ```
 zepp-voice-bridge/
+├── .github/workflows/
+│   └── release.yml          # GitHub Actions: build + release on tag push
 ├── app.js                  # BaseApp wrapper – BLE init
 ├── app.json                # Manifest: appId 1106856, API 4.0, target "gt" (round)
 ├── package.json            # @zeppos/zml ^0.0.41, zeus-cli
-├── icon.png                # Device icon 124x124
-├── icon-store-240.png      # Store icon 240x240 (circular, transparent bg)
+├── icon.png                # Store icon 240x240
 ├── SPECIFICATION.md         # PoC spec (English)
 ├── PRIVACY_POLICY.md        # Privacy policy for Zepp App Store
+├── verify-zab.sh           # ZAB package validation script
 ├── .gitignore
 ├── page/
-│   └── index.js            # Main UI: voice input → display → HTTP POST
+│   └── index.js            # Main UI: voice input → ARC spinner → response viewer
 ├── app-side/
-│   └── index.js            # Side service: GET_CONFIG → settings → response
+│   └── index.js            # Side service: GET_CONFIG + test connection handler
 ├── settings/
-│   └── index.js            # Companion settings UI (endpoint, auth, key, sender)
-└── assets/
-    ├── icon.png
-    └── gt.r/
-        └── icon.png
-```
+│   └── index.js            # Companion settings UI (endpoint, auth, payload, test)
+├── screenshots/             # App Store screenshots (360×360, circular)
+├── assets/
+│   ├── icon.png
+│   └── gt.r/
+│       └── icon.png
+└── IDEAS/                   # Local dev plans (outside repo, not in git)
 
 ## Architecture Flow
 
@@ -100,21 +104,19 @@ npx zeus build
 
 ## Pending / Next Steps
 
-- [ ] Publish to Zepp App Store (appId 1106856 registered)
-  - Upload ZAB package
-  - Provide 3+ screenshots (360x360 transparent bg)
-  - Store icon `icon-store-240.png` is ready
-  - Privacy policy `PRIVACY_POLICY.md` is ready (link via public GitHub repo)
-- [ ] Build ZAB package (`npx zeus build`) and test on device before submission
-- [ ] Future: message history, offline queue, retry logic
+- [ ] Upload ZAB to Zepp Console and submit for review
+  - Download from GitHub Release: https://github.com/piotrlo/zepp-voice-bridge/releases
+  - Provide 3+ screenshots (360×360 transparent bg) from `screenshots/`
+  - Privacy Policy URL: https://github.com/piotrlo/zepp-voice-bridge/blob/main/PRIVACY_POLICY.md
+- [ ] Future: OfflineQueue (persistent buffer), Multi-endpoint profiles, Complication trigger
 
 ### Completed
 
-- [x] Update SPECIFICATION.md to reflect universal auth (no hardcoded Bearer)
-- [x] Translate SPECIFICATION.md to English
-- [x] Add `pl-PL` i18n to app.json
-- [x] Unify Settings sublabels to English for store compatibility
-- [x] Write privacy policy (`PRIVACY_POLICY.md`)
+- [x] v1.1.0 release: ARC spinner, full-screen response, settings redesign, test connection
+- [x] GitHub Actions: automated ZAB build and Release on tag push
+- [x] Enhanced vibration patterns for send/success/error
+- [x] Device testing on Amazfit Active 2 NFC (real screenshots captured)
+- [x] Privacy policy (PRIVACY_POLICY.md) - public on GitHub
 
 ## Useful Documentation Links
 

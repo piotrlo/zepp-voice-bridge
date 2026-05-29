@@ -79,11 +79,33 @@ After `bun run build`, verify the `.zab` archive before sideload or store upload
 
 The script fails if `manifest.json` or `assets/icon.png` (124×124 device menu icon) is missing inside the package.
 
+## What's New in v1.1
+
+| Feature | Description |
+|---------|-------------|
+| **ARC progress indicator** | Animated spinning arc during HTTP requests, changes color on success/error |
+| **Full-screen response viewer** | Tap "Show response" to see the full server reply as formatted JSON |
+| **Redesigned settings** | Clearer sections with emoji headers, better spacing, concise labels |
+| **Test Connection** | Send a test POST directly from settings and see the result |
+| **Enhanced vibration** | Distinct haptic patterns for send start, success, and error |
+| **GitHub Actions release** | Automated ZAB build and GitHub Release on tag push |
+
 ## Requirements
 
 - Amazfit watch running **Zepp OS 3.0+** (API Level 4.0)
 - Zepp App on paired phone
 - Tested on: Amazfit Active 2 NFC
+
+## Release Process
+
+```bash
+# After merging to main:
+git tag v1.1.0 -m "Voice Bridge 1.1.0"
+git push origin v1.1.0
+# GitHub Actions builds the package and creates a Release automatically
+```
+
+See [RELEASE.md](IDEAS/RELEASE.md) for the full release checklist.
 
 ## Privacy
 
